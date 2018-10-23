@@ -32,7 +32,7 @@ The purpose if this is to:
 ### Unit dependencies must not be primitives
 
 A Unit may not depend on primitives, Automock will prevent this by halting your
-tests (throw exception) if your dependency is not a class/interface.
+test if your dependency is not a class/interface.
 
 This is mainly to enforce the pattern of wrapping all primitives into validated
 domain-specific value-objects.
