@@ -20,22 +20,19 @@ class AutomockListener
     public function __construct(Test $test)
     {
         if (is_a($test, AutomockTestCase::class)) {
+            try {
+                $testCaseReflection = new ReflectionClass($test);
+                $unitReflection = $this->getAutomockClassReflection($testCaseReflection);
 
-            $testCaseReflection = new ReflectionClass($test);
-            $unitReflection = $this->getAutomockClassReflection($testCaseReflection);
+                $dependencies = $this->getUnitDependencies($test, $unitReflection);
+                $unit = $unitReflection->newInstanceArgs($dependencies);
 
-            if (is_null($unitReflection)) {
-                $test->fail(
-                    'Automock: Could not resolve Unit to test, did you forget the @unit annotation in the TestCase?.'
-                );
+                $this->proxyProperties($test, $unit);
+                $this->proxyMethods($test, $unitReflection, $unit);
+
+            } catch (AutomockException $e) {
+                $test->fail("\r\nAutomock: " . $e->getMessage() . "\r\n" . $e->getHint()  . "\r\n");
             }
-
-            $dependencies = $this->getUnitDependencies($test, $unitReflection);
-            $unit = $unitReflection->newInstanceArgs($dependencies);
-
-            $this->proxyProperties($test, $unit);
-            $this->proxyMethods($test, $unitReflection, $unit);
-
         }
     }
 
@@ -51,6 +48,9 @@ class AutomockListener
             ->getMock();
     }
 
+    /**
+     * @throws AutomockException
+     */
     private function getAutomockClassReflection(ReflectionClass $testCaseReflection)
     {
 
@@ -63,12 +63,27 @@ class AutomockListener
                 $split = preg_split("/\s+/", $line);
                 if (count($split) === 2) {
                     $className = $split[1];
+                    if (!class_exists($className)) {
+                        throw new AutomockException(
+                            sprintf(
+                                "Could not find class '%s' in AutomockTestCase '%s'",
+                                $className,
+                                $testCaseReflection->getName()
+                            ),
+                            'Is the autoloading properly set up or is it only a spelling error?'
+                        );
+                    }
                     return new ReflectionClass($className);
                 }
             }
         }
 
-        return null;
+        throw new AutomockException(
+            sprintf(
+                "Could not find @unit annotation in AutomockTestCase '%s'",
+                $testCaseReflection->getName()
+            )
+        );
     }
 
     /**
@@ -83,12 +98,14 @@ class AutomockListener
         return array_map(function ($parameter) use ($test, $unitReflection) {
             $type = (string)$parameter->getType();
             if (!class_exists($type) && !interface_exists($type)) {
-                $test->fail(
+                throw new AutomockPatternException(
                     sprintf(
-                        'Automock: Pattern-enforcement - "%s" has a dependency "%s" which could not be resolved as a class or interface.',
+                        "'%s' has a dependency '%s' which could not be resolved as a class or interface. (resolved as an '%s').",
                         $unitReflection->getName(),
-                        $parameter->getName()
-                    )
+                        $parameter->getName(),
+                        $type
+                    ),
+                    "Primitive values must be wrapped in validated domain-specific value-objects"
                 );
             }
             return $this->buildMock($test, $type);
