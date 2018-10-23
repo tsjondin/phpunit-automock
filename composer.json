@@ -1,0 +1,20 @@
+{
+    "name": "tsjondin/automock",
+    "type": "library",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Tobias Sjöndin",
+            "email": "tobias.sjondin@gmail.com"
+        }
+    ],
+    "autoload": {
+        "psr-4": {
+            "Automock\\": "src/",
+            "Test\\": "tests/"
+        }
+    },
+    "require": {
+        "phpunit/phpunit": "^7.4"
+    }
+}
