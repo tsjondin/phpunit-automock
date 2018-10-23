@@ -1,6 +1,6 @@
 <?php
 
-namespace Test\Demo;
+namespace Demo\ValueObject;
 
 class Foo {
     public function getValue () {

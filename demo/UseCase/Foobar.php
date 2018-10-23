@@ -2,7 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Test\Demo;
+namespace Demo\UseCase;
+
+use Demo\ValueObject\Foo;
+use Demo\ValueObject\Bar;
 
 class Foobar
 {
@@ -17,9 +20,9 @@ class Foobar
         $this->bar = $bar;
     }
 
-    public function getFooTimesTwo()
+    public function getFoo()
     {
-        return $this->foo->getValue() * 2;
+        return $this->foo;
     }
 
     public function getBar()
