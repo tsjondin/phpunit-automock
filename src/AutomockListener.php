@@ -2,21 +2,43 @@
 
 declare(strict_types=1);
 
-use Automock\AutomockTestCase;
-use Automock\AutomockException;
-use PHPUnit\Framework\AssertionFailedError;
+namespace Automock;
+
+use ReflectionClass;
+use ReflectionObject;
 use PHPUnit\Framework\MockObject\MockBuilder;
 use PHPUnit\Framework\Test;
-use PHPUnit\Framework\TestListener;
-use PHPUnit\Framework\TestListenerDefaultImplementation;
-use PHPUnit\Framework\TestSuite;
-use PHPUnit\Framework\Warning;
 
-class AutomockListener implements TestListener
+class AutomockListener
 {
-    use TestListenerDefaultImplementation;
-
     const AM_ANNOTATION_KEY = '@unit';
+
+    /**
+     * The hook that sets up automocking if the current TestCase
+     * is extending the AutomockTestCase
+     */
+    public function __construct(Test $test)
+    {
+        if (is_a($test, AutomockTestCase::class)) {
+
+            $testCaseReflection = new ReflectionClass($test);
+            $unitReflection = $this->getAutomockClassReflection($testCaseReflection);
+
+            if (is_null($unitReflection)) {
+                throw new AutomockException(
+                    'Could not resolve Unit to test, did you forget the @unit annotation is TestCase?'
+                );
+            }
+
+            $dependencies = $this->getUnitDependencies($test, $unitReflection);
+            $unit = $unitReflection->newInstanceArgs($dependencies);
+
+            $this->proxyProperties($test, $unit);
+            $this->proxyMethods($test, $unitReflection, $unit);
+
+        }
+    }
+
 
     private function buildMock(Test $test, $type)
     {
@@ -94,32 +116,6 @@ class AutomockListener implements TestListener
             $name = $property->getName();
             $property->setAccessible(true);
             $test->{$name} = $property->getValue($unit);
-        }
-    }
-
-    /**
-     * The hook that sets up automocking if the current TestCase
-     * is extending the AutomockTestCase
-     */
-    public function startTest(Test $test): void
-    {
-        if (is_a($test, AutomockTestCase::class)) {
-
-            $testCaseReflection = new ReflectionClass($test);
-            $unitReflection = $this->getAutomockClassReflection($testCaseReflection);
-
-            if (is_null($unitReflection)) {
-                throw new AutomockException(
-                    'Could not resolve Unit to test, did you forget the @unit annotation is TestCase?'
-                );
-            }
-
-            $dependencies = $this->getUnitDependencies($test, $unitReflection);
-            $unit = $unitReflection->newInstanceArgs($dependencies);
-
-            $this->proxyProperties($test, $unit);
-            $this->proxyMethods($test, $unitReflection, $unit);
-
         }
     }
 
