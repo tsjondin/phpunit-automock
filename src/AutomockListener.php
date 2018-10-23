@@ -25,8 +25,8 @@ class AutomockListener
             $unitReflection = $this->getAutomockClassReflection($testCaseReflection);
 
             if (is_null($unitReflection)) {
-                throw new AutomockException(
-                    'Could not resolve Unit to test, did you forget the @unit annotation is TestCase?'
+                $test->fail(
+                    'Automock: Could not resolve Unit to test, did you forget the @unit annotation in the TestCase?.'
                 );
             }
 
@@ -80,8 +80,17 @@ class AutomockListener
         $constructor = $unitReflection->getConstructor();
         $constructorParameters = $constructor->getParameters();
 
-        return array_map(function ($parameter) use ($test) {
+        return array_map(function ($parameter) use ($test, $unitReflection) {
             $type = (string)$parameter->getType();
+            if (!class_exists($type) && !interface_exists($type)) {
+                $test->fail(
+                    sprintf(
+                        'Automock: Pattern-enforcement - "%s" has a dependency "%s" which could not be resolved as a class or interface.',
+                        $unitReflection->getName(),
+                        $parameter->getName()
+                    )
+                );
+            }
             return $this->buildMock($test, $type);
         }, $constructorParameters);
     }
