@@ -10,7 +10,7 @@ use PHPUnit\Framework\MockObject\MockBuilder;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\Test;
 
-class AutomockListener
+class MockInjector
 {
     const AUTOMOCK_ANNOTATION_KEY = '@unit';
 
@@ -26,9 +26,11 @@ class AutomockListener
                 $unitReflection = $this->getAutomockClassReflection($testCaseReflection);
 
                 $dependencies = $this->getUnitDependencies($test, $unitReflection);
-                $mocks = array_map(function ($dep) {
-                    return $dep['mock'];
+
+                $mocks = array_map(function (Dependency $dependency) {
+                    return $dependency->getMock();
                 }, $dependencies);
+
                 $unit = $unitReflection->newInstanceArgs($mocks);
 
                 $this->proxyProperties($test, $unit, $dependencies);
@@ -38,23 +40,6 @@ class AutomockListener
                 $test->fail("\r\nAutomock: " . $e->getMessage() . "\r\n" . $e->getHint()  . "\r\n");
             }
         }
-    }
-
-    /**
-     * Returns a MockObject for a given Test $test and class/interface of $type
-     */
-    private function buildMock(Test $test, $type): array
-    {
-        $builder = new MockBuilder($test, $type);
-        return [
-            'type' => $type,
-            'mock' => $builder
-            ->disableOriginalConstructor()
-            ->disableOriginalClone()
-            ->disableArgumentCloning()
-            ->disallowMockingUnknownTypes()
-            ->getMock(),
-        ];
     }
 
     /**
@@ -88,8 +73,8 @@ class AutomockListener
     {
         $annotations = $this->parseDocBlock($testCaseReflection->getDocComment());
 
-        if (isset($annotations[AutomockListener::AUTOMOCK_ANNOTATION_KEY])) {
-            return $annotations[AutomockListener::AUTOMOCK_ANNOTATION_KEY];
+        if (isset($annotations[MockInjector::AUTOMOCK_ANNOTATION_KEY])) {
+            return $annotations[MockInjector::AUTOMOCK_ANNOTATION_KEY];
         }
 
         throw new AutomockException(
@@ -141,7 +126,15 @@ class AutomockListener
                     "Primitives must be wrapped in validated domain-specific value-objects"
                 );
             }
-            return $this->buildMock($test, $type);
+            return new Dependency(
+                $type,
+                (new MockBuilder($test, $type))
+                    ->disableOriginalConstructor()
+                    ->disableOriginalClone()
+                    ->disableArgumentCloning()
+                    ->disallowMockingUnknownTypes()
+                    ->getMock()
+            );
         }, $constructorParameters);
     }
 
@@ -179,7 +172,7 @@ class AutomockListener
                 $property->setAccessible(false);
                 $name = $property->getName();
 
-                if ($dependency['mock'] === $value) {
+                if ($dependency->getMock() === $value) {
                     if (!$property->isPrivate() && !$property->isProtected()) {
                         throw new AutomockPatternException(
                             sprintf(

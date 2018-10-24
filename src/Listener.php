@@ -5,7 +5,7 @@ namespace Automock;
 use PHPUnit\Framework\Test;
 use PHPUnit\Framework\TestListener;
 use PHPUnit\Framework\TestListenerDefaultImplementation;
-use Automock\AutomockListener;
+use Automock\MockInjector;
 
 class Listener implements TestListener
 {
@@ -13,6 +13,6 @@ class Listener implements TestListener
 
     public function startTest(Test $test): void
     {
-        new AutomockListener($test);
+        new MockInjector($test);
     }
 }
