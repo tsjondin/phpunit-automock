@@ -6,7 +6,7 @@ namespace Automock;
 
 use PHPUnit\Framework\TestCase;
 
-class AutomockTestCase extends TestCase
+class UnitUnderTest extends TestCase
 {
 
     private $amMethods = [];

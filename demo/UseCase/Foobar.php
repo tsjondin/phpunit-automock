@@ -9,24 +9,26 @@ use Demo\ValueObject\Bar;
 
 class Foobar
 {
-    private $foo;
-    private $bar;
+    private $someRandomNameForFoo;
+    private $someRandomNameForBar;
+    private $someRandomNameForNonDependency;
 
     public function __construct(
         Foo $foo,
         Bar $bar
     ) {
-        $this->foo = $foo;
-        $this->bar = $bar;
+        $this->someRandomNameForFoo = $foo;
+        $this->someRandomNameForBar = $bar;
+        $this->someRandomNameForNonDependency = 1;
     }
 
     public function getFoo()
     {
-        return $this->foo;
+        return $this->someRandomNameForFoo;
     }
 
     public function getBar()
     {
-        return $this->bar;
+        return $this->someRandomNameForBar;
     }
 }

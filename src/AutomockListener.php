@@ -7,6 +7,7 @@ namespace Automock;
 use ReflectionClass;
 use ReflectionObject;
 use PHPUnit\Framework\MockObject\MockBuilder;
+use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\Test;
 
 class AutomockListener
@@ -14,11 +15,11 @@ class AutomockListener
     const AUTOMOCK_ANNOTATION_KEY = '@unit';
 
     /**
-     * Sets up automocking for the TestCase if it is extending the AutomockTestCase
+     * Sets up automocking for the TestCase if it is extending the UnitUnderTest
      */
     public function __construct(Test $test)
     {
-        if (is_a($test, AutomockTestCase::class)) {
+        if (is_a($test, UnitUnderTest::class)) {
             try {
 
                 $testCaseReflection = new ReflectionClass($test);
@@ -27,7 +28,7 @@ class AutomockListener
                 $dependencies = $this->getUnitDependencies($test, $unitReflection);
                 $unit = $unitReflection->newInstanceArgs($dependencies);
 
-                $this->proxyProperties($test, $unit);
+                $this->proxyProperties($test, $unit, $dependencies);
                 $this->proxyMethods($test, $unitReflection, $unit);
 
             } catch (AutomockException $e) {
@@ -39,7 +40,7 @@ class AutomockListener
     /**
      * Returns a MockObject for a given Test $test and class/interface of $type
      */
-    private function buildMock(Test $test, $type)
+    private function buildMock(Test $test, $type): MockObject
     {
         $builder = new MockBuilder($test, $type);
         return $builder
@@ -87,7 +88,7 @@ class AutomockListener
 
         throw new AutomockException(
             sprintf(
-                "Could not find @unit annotation in AutomockTestCase '%s'",
+                "Could not find @unit annotation in UnitUnderTest '%s'",
                 $testCaseReflection->getName()
             )
         );
@@ -102,7 +103,7 @@ class AutomockListener
         if (!class_exists($className)) {
             throw new AutomockException(
                 sprintf(
-                    "Could not find class '%s' in AutomockTestCase '%s'",
+                    "Could not find class '%s' in UnitUnderTest '%s'",
                     $className,
                     $testCaseReflection->getName()
                 ),
@@ -142,7 +143,7 @@ class AutomockListener
      * Reveals all unit methods as proxied methods on the
      * TestCase class that is testing the unit
      *
-     * This only works in conjunction with the AutomockTestCase
+     * This only works in conjunction with the UnitUnderTest
      * class and its magic __call method
      */
     private function proxyMethods(Test $test, ReflectionClass $unitReflection, $unit)
@@ -157,17 +158,27 @@ class AutomockListener
     }
 
     /**
-     * Reveals all unit propertis as proxied members on the
-     * TestCase class that is testing the unit
+     * Reveals properties on the unit that reflect dependencies as public
+     * properties on the TestCase
      */
-    private function proxyProperties(Test $test, $unit)
+    private function proxyProperties(Test $test, $unit, array $dependencies)
     {
         $activeReflectedUnit = new ReflectionObject($unit);
         $properties = $activeReflectedUnit->getProperties();
         foreach ($properties as $property) {
-            $name = $property->getName();
+
             $property->setAccessible(true);
-            $test->{$name} = $property->getValue($unit);
+            $value = $property->getValue($unit);
+            $property->setAccessible(false);
+
+            $name = $property->getName();
+
+            foreach ($dependencies as $dependency) {
+                if ($dependency === $value) {
+                    $test->{$name} = $value;
+                    continue;
+                }
+            }
         }
     }
 
