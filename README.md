@@ -6,7 +6,7 @@
 
 Automocking is to be used upon Units with dependencies, in order to use it one must:
 
-1. Define a PHPUnit listener that instantiates automock (see [the demo listener](./tests/MyAutomockListener.php))
+1. Register the Automock listener in [phpunit.xml](./phpunit.xml)
 2. Inherit the Automock\AutomockTestCase
 3. Define a unit in the testcase using the `@unit` annotation
 

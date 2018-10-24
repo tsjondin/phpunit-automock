@@ -11,16 +11,16 @@ use PHPUnit\Framework\Test;
 
 class AutomockListener
 {
-    const AM_ANNOTATION_KEY = '@unit';
+    const AUTOMOCK_ANNOTATION_KEY = '@unit';
 
     /**
-     * The hook that sets up automocking if the current TestCase
-     * is extending the AutomockTestCase
+     * Sets up automocking for the TestCase if it is extending the AutomockTestCase
      */
     public function __construct(Test $test)
     {
         if (is_a($test, AutomockTestCase::class)) {
             try {
+
                 $testCaseReflection = new ReflectionClass($test);
                 $unitReflection = $this->getAutomockClassReflection($testCaseReflection);
 
@@ -36,7 +36,9 @@ class AutomockListener
         }
     }
 
-
+    /**
+     * Returns a MockObject for a given Test $test and class/interface of $type
+     */
     private function buildMock(Test $test, $type)
     {
         $builder = new MockBuilder($test, $type);
@@ -49,33 +51,38 @@ class AutomockListener
     }
 
     /**
-     * @throws AutomockException
+     * Rough-handedly parse a docblock in order to find annotations
+     *
+     * Finds anything starting with @ and sets it as a key in an assoc. array with
+     * any trailing values as the value. If there are no trailing values it simply
+     * sets it to true
      */
-    private function getAutomockClassReflection(ReflectionClass $testCaseReflection)
+    private function parseDocBlock(string $docblock): array
     {
-
-        $block = trim(trim($testCaseReflection->getDocComment(), "/*/ \r\n"));
+        $block = trim(trim($docblock, "/*/ \r\n"));
         $lines = preg_split("/\r\n|\n/", $block);
 
-        foreach ($lines as $line) {
+        return array_reduce($lines, function (array $annotations, string $line): array {
             $line = trim($line);
-            if (strpos($line, AutomockListener::AM_ANNOTATION_KEY) === 0) {
+            if (strpos($line, '@') === 0) {
                 $split = preg_split("/\s+/", $line);
-                if (count($split) === 2) {
-                    $className = $split[1];
-                    if (!class_exists($className)) {
-                        throw new AutomockException(
-                            sprintf(
-                                "Could not find class '%s' in AutomockTestCase '%s'",
-                                $className,
-                                $testCaseReflection->getName()
-                            ),
-                            'Is the autoloading properly set up or is it only a spelling error?'
-                        );
-                    }
-                    return new ReflectionClass($className);
-                }
+                $key = array_shift($split);
+                $value = (count($split) > 0) ? implode(' ', $split) : true;
+                return array_merge([$key => $value], $annotations);
             }
+            return $annotations;
+        }, []);
+    }
+
+    /**
+     * @throws AutomockException If no unit annotation could be found
+     */
+    private function findUnitClassName(ReflectionClass $testCaseReflection): string
+    {
+        $annotations = $this->parseDocBlock($testCaseReflection->getDocComment());
+
+        if (isset($annotations[AutomockListener::AUTOMOCK_ANNOTATION_KEY])) {
+            return $annotations[AutomockListener::AUTOMOCK_ANNOTATION_KEY];
         }
 
         throw new AutomockException(
@@ -84,6 +91,25 @@ class AutomockListener
                 $testCaseReflection->getName()
             )
         );
+    }
+
+    /**
+     * @throws AutomockException If the Unit specified could not be found
+     */
+    private function getAutomockClassReflection(ReflectionClass $testCaseReflection): ReflectionClass
+    {
+        $className = $this->findUnitClassName($testCaseReflection);
+        if (!class_exists($className)) {
+            throw new AutomockException(
+                sprintf(
+                    "Could not find class '%s' in AutomockTestCase '%s'",
+                    $className,
+                    $testCaseReflection->getName()
+                ),
+                'Is the autoloading properly set up or is it only a spelling error?'
+            );
+        }
+        return new ReflectionClass($className);
     }
 
     /**
