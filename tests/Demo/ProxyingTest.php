@@ -29,7 +29,7 @@ class ProxyingTest extends UnitUnderTest
     {
         $this->expectException(Notice::class);
         $this->expectExceptionMessage("Undefined property: Test\ProxyingTest::\$someRandomNameForNonDependency");
-        $this->assertEquals(1, $this->someRandomNameForNonDependency);
+        $this->someRandomNameForNonDependency;
     }
 
     /**

@@ -26,7 +26,10 @@ class AutomockListener
                 $unitReflection = $this->getAutomockClassReflection($testCaseReflection);
 
                 $dependencies = $this->getUnitDependencies($test, $unitReflection);
-                $unit = $unitReflection->newInstanceArgs($dependencies);
+                $mocks = array_map(function ($dep) {
+                    return $dep['mock'];
+                }, $dependencies);
+                $unit = $unitReflection->newInstanceArgs($mocks);
 
                 $this->proxyProperties($test, $unit, $dependencies);
                 $this->proxyMethods($test, $unitReflection, $unit);
@@ -40,15 +43,18 @@ class AutomockListener
     /**
      * Returns a MockObject for a given Test $test and class/interface of $type
      */
-    private function buildMock(Test $test, $type): MockObject
+    private function buildMock(Test $test, $type): array
     {
         $builder = new MockBuilder($test, $type);
-        return $builder
+        return [
+            'type' => $type,
+            'mock' => $builder
             ->disableOriginalConstructor()
             ->disableOriginalClone()
             ->disableArgumentCloning()
             ->disallowMockingUnknownTypes()
-            ->getMock();
+            ->getMock(),
+        ];
     }
 
     /**
@@ -132,7 +138,7 @@ class AutomockListener
                         $parameter->getName(),
                         $type
                     ),
-                    "Primitive values must be wrapped in validated domain-specific value-objects"
+                    "Primitives must be wrapped in validated domain-specific value-objects"
                 );
             }
             return $this->buildMock($test, $type);
@@ -165,20 +171,41 @@ class AutomockListener
     {
         $activeReflectedUnit = new ReflectionObject($unit);
         $properties = $activeReflectedUnit->getProperties();
-        foreach ($properties as $property) {
 
-            $property->setAccessible(true);
-            $value = $property->getValue($unit);
-            $property->setAccessible(false);
+        $allMatched = array_map(function ($dependency) use ($properties, $unit, $test, $activeReflectedUnit) {
+            return array_reduce($properties, function ($propertyMatched, $property) use ($unit, $dependency, $test, $activeReflectedUnit) {
+                $property->setAccessible(true);
+                $value = $property->getValue($unit);
+                $property->setAccessible(false);
+                $name = $property->getName();
 
-            $name = $property->getName();
-
-            foreach ($dependencies as $dependency) {
-                if ($dependency === $value) {
+                if ($dependency['mock'] === $value) {
+                    if (!$property->isPrivate() && !$property->isProtected()) {
+                        throw new AutomockPatternException(
+                            sprintf(
+                                "'%s' assigns dependency '%s' to a non-private/protected member '%s'.",
+                                $activeReflectedUnit->getName(),
+                                $dependency['type'],
+                                $name
+                            ),
+                            "All dependency containing properties of a Unit must be private or protected."
+                        );
+                    }
                     $test->{$name} = $value;
-                    continue;
+                    return true;
                 }
-            }
+                return $propertyMatched || false;
+            }, false);
+        }, $dependencies);
+
+        if (in_array(false, $allMatched)) {
+            throw new AutomockPatternException(
+                sprintf(
+                    "'%s' does not assign all its dependencies.",
+                    $activeReflectedUnit->getName()
+                ),
+                "False/Factory dependencies are not allowed, all dependencies must be assigned to properties on the Unit."
+            );
         }
     }
 

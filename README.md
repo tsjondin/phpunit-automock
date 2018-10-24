@@ -45,7 +45,40 @@ These value-object should not be tested with Automock but in a common PHPUnit
 TestCase, since they should not have any dependencies to mock, and should have
 no side-effects.
 
-### No ephemeral "dependencies"
+### No ephemeral dependencies
+
+**In short, the Unit must assign all of its dependencies to private properties on
+that Unit.**
+
+#### Encapsulation
+
+No other class that uses a Unit should implictly be able to utilize/mutate
+the dependecies of that Unit.
+
+#### Factory dependencies
+
+A dependency which is only used in order to retrieve a second value during
+instantiation of the Unit. E.g.
+
+Automock will automatically fail:
+```php
+class A {
+	private $c;
+
+	public function __construct(B $b) {
+		$this->c = $b->getSomethingElse(); // Returns C
+	}
+}
+```
+
+In such a case the value returned by the factory should be wrapped in a
+value-object, which makes is a viable direct dependency. The dependency
+injection should support defining a dependency as the result of a function call
+(factory) which should be used in this case.
+
+#### False dependencies
+
+Related to factory dependencies.
 
 A Unit may not depend on something which it does not actually require, such as
 for instantiating a secondary class with this "dependency" as the argument. In
@@ -83,6 +116,3 @@ class A {
 }
 ```
 
-In addition the Unit must assign the dependency to a private property on the Unit.
-No other class that uses the Unit should implictly be able to utilize/mutate
-the dependecies of the Unit.
