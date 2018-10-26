@@ -33,6 +33,18 @@ The purpose if this is to:
 
 ## Enforced patterns
 
+### Coverage
+
+All functions that are public on the unit must have been explicitly invoked
+from the test or Automock will fail the test.
+
+All dependencies of the Unit must have been used during the testing of the Unit
+or Automock will fail the test.
+
+### Unit dependency parameter name must match property name
+
+This is a small price to pay in order to avoid confusion.
+
 ### Unit dependencies must not be primitives
 
 A Unit may not depend on primitives, Automock will prevent this by halting your

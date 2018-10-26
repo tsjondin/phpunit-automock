@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Demo\ValueObject;
+namespace Test\Demo\ValueObject;
 
 class Bar {
 

@@ -35,11 +35,16 @@ class MockInjector
 
                 $this->proxyProperties($test, $unit, $dependencies);
                 $this->proxyMethods($test, $unitReflection, $unit);
+                $test->__setAutomockUnitTest($test);
 
             } catch (AutomockException $e) {
                 $test->fail("\r\nAutomock: " . $e->getMessage() . "\r\n" . $e->getHint()  . "\r\n");
             }
         }
+    }
+
+    public function resolve(Test $test)
+    {
     }
 
     /**
@@ -127,6 +132,7 @@ class MockInjector
                 );
             }
             return new Dependency(
+                $parameter->getName(),
                 $type,
                 (new MockBuilder($test, $type))
                     ->disableOriginalConstructor()
@@ -149,9 +155,13 @@ class MockInjector
     {
         $methods = $unitReflection->getMethods();
         foreach ($methods as $method) {
-            if ($method->isPublic() && !$method->isStatic()) {
+            if ($method->isPublic()
+                && !$method->isStatic()
+                && !$method->isConstructor()
+                && !$method->isDestructor()
+            ) {
                 $name = $method->getName();
-                $test->__defineAMMethod($unit, $name);
+                $test->__defineAutomockProxyMethod($unit, $name);
             }
         }
     }
@@ -178,10 +188,22 @@ class MockInjector
                             sprintf(
                                 "'%s' assigns dependency '%s' to a non-private/protected member '%s'.",
                                 $activeReflectedUnit->getName(),
-                                $dependency['type'],
+                                $dependency->getType(),
                                 $name
                             ),
                             "All dependency containing properties of a Unit must be private or protected."
+                        );
+                    }
+                    if ($name !== $dependency->getName()) {
+                        throw new AutomockPatternException(
+                            sprintf(
+                                "'%s' assigns dependency '%s' named '%s' to member named '%s'.",
+                                $activeReflectedUnit->getName(),
+                                $dependency->getType(),
+                                $dependency->getName(),
+                                $name
+                            ),
+                            "Dependencies should have the same parameter name as the property name."
                         );
                     }
                     $test->{$name} = $value;
@@ -197,7 +219,7 @@ class MockInjector
                     "'%s' does not assign all its dependencies.",
                     $activeReflectedUnit->getName()
                 ),
-                "False/Factory dependencies are not allowed, all dependencies must be assigned to properties on the Unit."
+                "Ephemeral dependencies are not allowed, all dependencies must be assigned to properties on the Unit."
             );
         }
     }
